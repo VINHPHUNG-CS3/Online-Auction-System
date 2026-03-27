@@ -1,4 +1,4 @@
-package com.bt;
+package com.bt.client;
 
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -22,16 +22,15 @@ public class App extends Application {
         stage.show();
     }
 
-    static void setRoot(String fxml) throws IOException {
+    public static void setRoot(String fxml) throws IOException {
         scene.setRoot(loadFXML(fxml));
     }
 
     private static Parent loadFXML(String fxml) throws IOException {
-        FXMLLoader fxmlLoader = new FXMLLoader(App.class.getResource(fxml + ".fxml"));
-        return fxmlLoader.load();
+        FXMLLoader fxmlLoader = new FXMLLoader(App.class.getResource("/com/bt/" + fxml + ".fxml"));
+        return fxmlLoader.load(); 
     }
-
-    public static void main(String[] args) {
+     public static void main(String[] args) {
         launch();
     }
 

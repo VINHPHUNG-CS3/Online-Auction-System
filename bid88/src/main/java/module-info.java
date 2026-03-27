@@ -2,6 +2,12 @@ module com.bt {
     requires javafx.controls;
     requires javafx.fxml;
 
-    opens com.bt to javafx.fxml;
-    exports com.bt;
+    // Cấp quyền cho JavaFX truy cập vào thư mục controller để gắn sự kiện (nút bấm, text...)
+    opens com.bt.client.controller to javafx.fxml;
+    
+    // Cấp quyền cho thư mục chứa App.java (nếu cần)
+    opens com.bt.client to javafx.fxml;
+
+    // Cho phép module chạy class App.java
+    exports com.bt.client;
 }
