@@ -1,4 +1,5 @@
 module com.bt {
+    requires java.sql; //Thêm sql
     requires javafx.controls;
     requires javafx.fxml;
 

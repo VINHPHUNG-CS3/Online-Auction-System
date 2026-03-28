@@ -5,6 +5,8 @@ public class Bidder extends User {
     // Specific attribute just for Bidders
     private double accountBalance;
 
+    public Bidder() {} //Constructor rỗng
+
     public Bidder(String username, String email, String password, double startingBalance) {
         super(username, email, password); // Pass basic info up to the User class
         this.accountBalance = startingBalance;

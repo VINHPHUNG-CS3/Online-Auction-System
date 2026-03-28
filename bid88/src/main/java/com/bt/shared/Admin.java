@@ -5,6 +5,10 @@ public class Admin extends User {
     // Specific attribute just for Admins (e.g., 1 = Moderator, 5 = Super Admin)
     private int accessLevel;
 
+    public Admin() {
+        super("", "", ""); // Gọi constructor cha với chuỗi rỗng
+    }
+
     public Admin(String username, String email, String password, int accessLevel) {
         super(username, email, password); // Pass basic info up to the User class
         this.accessLevel = accessLevel;

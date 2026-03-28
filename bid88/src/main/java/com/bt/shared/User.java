@@ -10,6 +10,9 @@ public abstract class User extends Entity {
     private String username;
     private String email;
     private String password;
+    private String role;
+
+    public User() { } // Constructor rỗng
 
     public User(String username, String email, String password) {
         super(); // Calls the Entity constructor to generate the unique ID
@@ -41,6 +44,10 @@ public abstract class User extends Entity {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public void setRole(String role) {
+        this.role = role; 
     }
 
     // Polymorphism: We are defining how displayInfo() works for a User

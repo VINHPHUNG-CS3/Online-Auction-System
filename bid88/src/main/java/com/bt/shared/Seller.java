@@ -5,6 +5,8 @@ public class Seller extends User {
     // Specific attribute just for Sellers
     private double sellerRating;
 
+    public Seller() {} //Constructor rỗng
+
     public Seller(String username, String email, String password, double initialRating) {
         super(username, email, password);
         this.sellerRating = initialRating;
