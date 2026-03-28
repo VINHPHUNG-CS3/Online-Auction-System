@@ -28,9 +28,10 @@ public class App extends Application {
 
     private static Parent loadFXML(String fxml) throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(App.class.getResource("/com/bt/" + fxml + ".fxml"));
-        return fxmlLoader.load(); 
+        return fxmlLoader.load();
     }
-     public static void main(String[] args) {
+
+    public static void main(String[] args) {
         launch();
     }
 
