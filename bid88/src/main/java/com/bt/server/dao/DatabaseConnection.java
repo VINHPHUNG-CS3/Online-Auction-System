@@ -5,10 +5,9 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DatabaseConnection {
-    // Lưu ý: Dù bạn đổi cổng Apache thành 8080, thì cổng của MySQL vẫn luôn là 3306 nhé!
-    private static final String URL = "jdbc:mysql://localhost:3306/auction_db";
-    private static final String USER = "root"; 
-    private static final String PASSWORD = ""; 
+    private static final String URL = "jdbc:mysql://26.4.214.252:3306/auction_db";
+    private static final String USER = "VQTT"; 
+    private static final String PASSWORD = "29122007"; 
 
     public static Connection getConnection() {
         Connection conn = null;
