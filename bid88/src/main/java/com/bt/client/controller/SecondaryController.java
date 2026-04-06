@@ -1,107 +1,151 @@
-package com.bt.client.controller; // Make sure this matches your package structure!
+package com.bt.client.controller;
+
+import com.bt.client.SessionData;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-
-import com.bt.client.App;
-import com.bt.shared.Art;
-import com.bt.shared.Auction;
-import com.bt.shared.Bidder;
-import com.bt.shared.Seller;
-
+import javafx.application.Platform; // Import this!
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 
-public class SecondaryController {
+import com.bt.client.App;
+import com.bt.client.SessionData;
+import com.bt.shared.Auction;
+import com.bt.shared.BidTransaction;
+import com.bt.shared.exceptions.AuctionClosedException;
+import com.bt.shared.exceptions.InvalidBidException;
+import com.bt.shared.BidObserver; // Import your observer
 
-    // --- UI Elements linked from secondary.fxml ---
+// 1. Implement the BidObserver interface
+public class SecondaryController implements BidObserver {
+
     @FXML
     private Label itemNameLabel;
+    @FXML
+    private Label itemDescriptionLabel;
     @FXML
     private Label currentPriceLabel;
     @FXML
     private TextField bidInputBox;
 
-    // --- Core OOP Objects ---
     private Auction currentAuction;
-    private Bidder currentBidder;
 
-    /**
-     * This method runs automatically when the secondary.fxml is loaded.
-     * We use it to set up our mock data to test the UI.
-     */
     @FXML
     public void initialize() {
-        // 1. Create a mock Seller and a mock Item (Art)
-        Seller seller = new Seller("SellerBob", "bob@example.com", "password", 4.8);
-        Art painting = new Art("Rare Oil Painting", "A beautiful 19th-century landscape.", 500.00, "Vincent", 1885);
+        currentAuction = SessionData.sharedAuction;
 
-        // 2. Create the Auction and set it to RUNNING so we can bid on it
-        currentAuction = new Auction(painting, seller, LocalDateTime.now(), LocalDateTime.now().plusDays(3));
-        currentAuction.setStatus(Auction.AuctionStatus.RUNNING);
+        if (currentAuction != null) {
+            // Register this screen to listen for live updates
+            currentAuction.addObserver(this);
 
-        // 3. Create a mock Bidder (The person currently using the app)
-        currentBidder = new Bidder("You_The_User", "user@example.com", "123", 10000.00);
+            // --- SET INITIAL LABELS ---
 
-        // 4. Update the User Interface to show the item's details
-        itemNameLabel.setText("Item: " + currentAuction.getItem().getName());
-        currentPriceLabel.setText("Current Price: $" + currentAuction.getItem().getStartingPrice());
-    }
+            // 2. Get the item details from the auction
+            String name = currentAuction.getItem().getName();
+            String desc = currentAuction.getItem().getDescription();
 
-    /**
-     * This method is triggered when the user clicks the "Place Bid" button.
-     */
-    @FXML
-    private void handlePlaceBid() {
-        try {
-            // Grab the text from the input box and turn it into a decimal number
-            double bidAmount = Double.parseDouble(bidInputBox.getText());
-
-            // Try to place the bid using our OOP Auction logic
-            boolean success = currentAuction.placeBid(currentBidder, bidAmount);
-
-            if (success) {
-                // If the bid was valid (higher than current price), update the screen
-                double newPrice = currentAuction.getHighestBid().getBidAmount();
-                currentPriceLabel.setText("Current Price: $" + newPrice);
-                bidInputBox.clear();
-
-                // Show a success popup
-                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Success! You are the highest bidder currently.");
-                alert.setTitle("Bid Placed");
-                alert.setHeaderText(null);
-                alert.show();
-
-                // Print the updated auction info to the console
-                currentAuction.displayInfo();
+            // 3. Figure out what price to show initially
+            // If someone has already bid, show the highest bid.
+            // If no one has bid yet, show the item's starting price.
+            double displayPrice;
+            if (currentAuction.getHighestBid() != null) {
+                displayPrice = currentAuction.getHighestBid().getBidAmount();
             } else {
-                // If the bid was too low, show a warning popup
-                double currentPrice = (currentAuction.getHighestBid() != null)
-                        ? currentAuction.getHighestBid().getBidAmount()
-                        : currentAuction.getItem().getStartingPrice();
-
-                Alert alert = new Alert(Alert.AlertType.WARNING, "Your bid must be higher than $" + currentPrice);
-                alert.setTitle("Invalid Bid");
-                alert.setHeaderText(null);
-                alert.show();
+                displayPrice = currentAuction.getItem().getStartingPrice();
             }
 
-        } catch (NumberFormatException e) {
-            // If the user typed words instead of numbers, show an error
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Please enter a valid number!");
-            alert.setTitle("Input Error");
-            alert.setHeaderText(null);
-            alert.show();
+            // 4. Set the text on the JavaFX screen
+            itemNameLabel.setText(name);
+            // itemDescriptionLabel.setText(desc);
+            currentPriceLabel.setText("Current Price: $" + displayPrice);
         }
     }
 
-    /**
-     * Navigates back to the Dashboard.
-     */
+    // 3. This method is forced by the BidObserver interface
+    @Override
+    public void update(BidTransaction newBid) {
+        // Platform.runLater safely updates the JavaFX UI from background threads
+        Platform.runLater(() -> {
+            currentPriceLabel.setText("Current Price: $" + newBid.getBidAmount());
+        });
+    }
+
+    @FXML
+    public void handlePlaceBid() { // Note: Make sure the name matches your FXML!
+        try {
+            // 1. Read the number from the text box
+            double amount = Double.parseDouble(bidInputBox.getText());
+
+            // 2. This line throws the exception if the bid is too low!
+            currentAuction.placeBid(SessionData.currentUser, amount);
+
+            // 3. If no error was thrown, show the success popup
+            Alert successAlert = new Alert(AlertType.INFORMATION);
+            successAlert.setTitle("Bid Successful");
+            successAlert.setHeaderText(null);
+            successAlert.setContentText("Your bid of $" + amount + " has been placed successfully!");
+            successAlert.showAndWait();
+
+            bidInputBox.clear();
+
+        } catch (NumberFormatException e) {
+            showErrorPopup("Invalid Input", "Please enter a valid number for your bid.");
+
+        } catch (AuctionClosedException e) {
+            showErrorPopup("Auction Closed", e.getMessage());
+
+        } catch (InvalidBidException e) {
+            // THE FIX IS HERE: We catch the error and turn it into a popup!
+            showErrorPopup("Invalid Bid", e.getMessage());
+        }
+    }
+
+    @FXML
+    public void handlePlaceBidButton() {
+        try {
+            // 1. Try to read the number from the text box
+            double amount = Double.parseDouble(bidInputBox.getText());
+
+            // 2. Try to place the bid (this might throw our custom exceptions)
+            currentAuction.placeBid(SessionData.currentUser, amount);
+
+            // 3. IF SUCCESS: Show a success popup
+            Alert successAlert = new Alert(AlertType.INFORMATION);
+            successAlert.setTitle("Bid Successful");
+            successAlert.setHeaderText(null);
+            successAlert.setContentText("Your bid of $" + amount + " has been placed successfully!");
+            successAlert.showAndWait();
+
+            // Clear the text box for the next bid
+            bidInputBox.clear();
+
+        } catch (NumberFormatException e) {
+            // ERROR: User typed letters or symbols instead of a number
+            showErrorPopup("Invalid Input", "Please enter a valid number for your bid.");
+
+        } catch (AuctionClosedException e) {
+            // ERROR: Auction is finished
+            showErrorPopup("Auction Closed", e.getMessage());
+
+        } catch (InvalidBidException e) {
+            // ERROR: Bid was too low
+            showErrorPopup("Invalid Bid", e.getMessage());
+        }
+    }
+
+    // Helper method to keep our code clean!
+    private void showErrorPopup(String title, String message) {
+        Alert errorAlert = new Alert(AlertType.ERROR);
+        errorAlert.setTitle(title);
+        errorAlert.setHeaderText(null);
+        errorAlert.setContentText(message);
+        errorAlert.showAndWait();
+    }
+
     @FXML
     private void switchToPrimary() throws IOException {
-        App.setRoot("primary"); // Ensure your App class has the setRoot method!
+        App.setRoot("primary");
     }
 }

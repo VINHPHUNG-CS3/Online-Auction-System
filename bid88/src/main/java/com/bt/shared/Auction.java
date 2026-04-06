@@ -3,13 +3,14 @@ package com.bt.shared;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * Manages the central auction session for a specific item.
- */
+// Don't forget to import the exceptions at the top of Auction.java!
+import com.bt.shared.exceptions.AuctionClosedException;
+import com.bt.shared.exceptions.InvalidBidException;
+
 public class Auction extends Entity {
 
-    // Define the specific states required by the assignment
     public enum AuctionStatus {
         OPEN, RUNNING, FINISHED, PAID, CANCELED
     }
@@ -20,9 +21,14 @@ public class Auction extends Entity {
     private LocalDateTime endTime;
     private AuctionStatus status;
 
-    // Aggregation: An auction contains a history of bids
     private List<BidTransaction> bidHistory;
     private BidTransaction highestBid;
+
+    // Concurrency: Lock to ensure thread safety
+    private final ReentrantLock lock;
+
+    // Observer Pattern: List of screens watching this auction
+    private transient List<BidObserver> observers;
 
     public Auction(Item item, Seller seller, LocalDateTime startTime, LocalDateTime endTime) {
         super();
@@ -30,38 +36,68 @@ public class Auction extends Entity {
         this.seller = seller;
         this.startTime = startTime;
         this.endTime = endTime;
-        this.status = AuctionStatus.OPEN; // Default state
+        this.status = AuctionStatus.OPEN;
         this.bidHistory = new ArrayList<>();
-        this.highestBid = null;
+        this.lock = new ReentrantLock();
+        this.observers = new ArrayList<>(); // Initialize the observer list
     }
 
-    /**
-     * Core Logic: Place a bid.
-     * The 'synchronized' keyword ensures thread safety for Concurrent Bidding.
-     * If two bidders click at the exact same time, Java processes them one by one.
-     */
-    public synchronized boolean placeBid(Bidder bidder, double amount) {
-        // Validation: Cannot bid if auction is not running
-        if (status != AuctionStatus.RUNNING) {
-            System.out.println("Error: Auction is not currently active.");
-            return false;
+    // --- LOGIC: OBSERVER PATTERN ---
+    public void addObserver(BidObserver observer) {
+        if (this.observers == null) {
+            this.observers = new ArrayList<>();
         }
+        this.observers.add(observer);
+    }
 
-        double currentHighest = (highestBid != null) ? highestBid.getBidAmount() : item.getStartingPrice();
-
-        // Validation: Bid must be strictly higher than current price
-        if (amount <= currentHighest) {
-            System.out.println("Error: Bid must be higher than the current price of $" + currentHighest);
-            return false;
+    private void notifyObservers(BidTransaction bid) {
+        for (BidObserver observer : observers) {
+            observer.update(bid);
         }
+    }
 
-        // Create transaction, record it, and update the highest bid
-        BidTransaction newBid = new BidTransaction(bidder, amount);
-        bidHistory.add(newBid);
-        highestBid = newBid;
+    // --- LOGIC: STATUS CHANGE ---
+    public void changeStatus(AuctionStatus newStatus) {
+        if (this.status == AuctionStatus.OPEN && newStatus == AuctionStatus.RUNNING) {
+            this.status = newStatus;
+        } else if (this.status == AuctionStatus.RUNNING && newStatus == AuctionStatus.FINISHED) {
+            this.status = newStatus;
+        } else if (this.status == AuctionStatus.FINISHED
+                && (newStatus == AuctionStatus.PAID || newStatus == AuctionStatus.CANCELED)) {
+            this.status = newStatus;
+        } else {
+            System.out.println("Error: Cannot change status from " + this.status + " to " + newStatus);
+        }
+    }
 
-        System.out.println("Success! " + bidder.getUsername() + " placed a bid of $" + amount);
-        return true;
+    // --- LOGIC: CONCURRENT BIDDING ---
+    public boolean placeBid(Bidder bidder, double amount) throws AuctionClosedException, InvalidBidException {
+        lock.lock(); // Block other threads from entering
+        try {
+            if (status != AuctionStatus.RUNNING) {
+                System.out.println("Error: Auction is not running.");
+                throw new AuctionClosedException("Bidding failed: This auction has already ended!");
+            }
+
+            double currentHighest = (highestBid != null) ? highestBid.getBidAmount() : item.getStartingPrice();
+
+            if (amount <= currentHighest) {
+                // THROW the custom exception instead of printing!
+                throw new InvalidBidException("Bid must be higher than the current highest bid of $" + currentHighest);
+            }
+
+            BidTransaction newBid = new BidTransaction(bidder, amount);
+            bidHistory.add(newBid);
+            highestBid = newBid;
+
+            // Notify the GUI that a new bid was placed!
+            notifyObservers(newBid);
+
+            return true;
+
+        } finally {
+            lock.unlock(); // ALWAYS unlock in finally block
+        }
     }
 
     // Getters and Setters
@@ -69,16 +105,20 @@ public class Auction extends Entity {
         return item;
     }
 
+    public void setItem(Item item) {
+        this.item = item;
+    }
+
     public Seller getSeller() {
         return seller;
     }
 
-    public LocalDateTime getStartTime() {
-        return startTime;
+    public void setSeller(Seller seller) {
+        this.seller = seller;
     }
 
-    public LocalDateTime getEndTime() {
-        return endTime;
+    public BidTransaction getHighestBid() {
+        return highestBid;
     }
 
     public AuctionStatus getStatus() {
@@ -89,14 +129,6 @@ public class Auction extends Entity {
         this.status = status;
     }
 
-    public List<BidTransaction> getBidHistory() {
-        return bidHistory;
-    }
-
-    public BidTransaction getHighestBid() {
-        return highestBid;
-    }
-
     @Override
     public void displayInfo() {
         System.out.println("--- AUCTION SESSION: " + getId() + " ---");
@@ -105,7 +137,7 @@ public class Auction extends Entity {
         System.out.println("Seller: " + seller.getUsername());
 
         if (highestBid != null) {
-            System.out.println("Current Highest Bid: $" + highestBid.getBidAmount() + " by "
+            System.out.println("Current Highest Bid: $" + highestBid.getBidAmount() + "by "
                     + highestBid.getBidder().getUsername());
         } else {
             System.out.println("No bids placed yet. Starting at: $" + item.getStartingPrice());
