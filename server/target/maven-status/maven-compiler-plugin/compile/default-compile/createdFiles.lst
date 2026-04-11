@@ -1,0 +1,4 @@
+com\bt\server\controller\AuctionServer.class
+com\bt\server\dao\DatabaseConnection.class
+com\bt\server\dao\UserDAO.class
+com\bt\server\dao\TestUser.class

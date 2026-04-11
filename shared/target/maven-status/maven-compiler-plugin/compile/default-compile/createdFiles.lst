@@ -1,0 +1,12 @@
+com\bt\shared\Bidder.class
+com\bt\shared\Admin.class
+com\bt\shared\Auction$AuctionStatus.class
+com\bt\shared\Auction.class
+com\bt\shared\Electronics.class
+com\bt\shared\User.class
+com\bt\shared\Art.class
+com\bt\shared\Item.class
+com\bt\shared\BidTransaction.class
+com\bt\shared\Seller.class
+com\bt\shared\Entity.class
+com\bt\shared\Vehicle.class
